@@ -1,0 +1,154 @@
+/* =======================================================
+   style.css - ESTILOS BÁSICOS PARA EL JUEGO DE SUBASTA
+   ======================================================= */
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #e9ebee; /* Fondo gris claro */
+    color: #333;
+}
+
+h1 {
+    text-align: center;
+    color: #004d99; /* Azul oscuro */
+    margin-bottom: 30px;
+}
+
+#game-container {
+    max-width: 800px;
+    margin: 0 auto;
+    background: #ffffff;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* --- SECCIÓN DE SUBASTA ACTUAL --- */
+#info-subasta {
+    border-bottom: 2px solid #f0f0f0;
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+#info-subasta h2 {
+    color: #4CAF50; /* Verde para el jugador en subasta */
+    font-size: 1.8em;
+    margin-bottom: 5px;
+}
+
+#info-subasta p {
+    font-size: 1.1em;
+}
+
+#info-subasta b {
+    font-weight: bold;
+    color: #D32F2F; /* Rojo para la oferta */
+    font-size: 1.5em;
+    display: inline-block;
+    margin-top: 5px;
+}
+
+/* --- INFO DE PARTICIPANTES Y PRESUPUESTOS --- */
+#info-participantes {
+    background-color: #f7f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    margin-bottom: 20px;
+}
+
+#info-participantes h3 {
+    border-bottom: 1px dashed #ccc;
+    padding-bottom: 8px;
+    margin-top: 0;
+    color: #007bff; /* Azul de información */
+}
+
+#info-participantes p b {
+    color: #2c3e50;
+}
+
+/* --- CONTROLES DEL JUGADOR --- */
+#controles-player {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 15px;
+    border-top: 1px solid #f0f0f0;
+}
+
+#controles-player input[type="number"] {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    width: 100px;
+    font-size: 1em;
+}
+
+#controles-player button {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.3s;
+}
+
+#boton-puja {
+    background-color: #007bff; /* Azul principal */
+    color: white;
+}
+
+#boton-puja:hover {
+    background-color: #0056b3;
+}
+
+#boton-salto {
+    background-color: #ff9800; /* Naranja para advertencia/salto */
+    color: white;
+}
+
+#boton-salto:hover {
+    background-color: #e68900;
+}
+
+#boton-salto[disabled] {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+/* --- REGISTRO DE MENSAJES --- */
+#mensajes {
+    max-height: 250px;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+    padding: 10px;
+    margin-top: 20px;
+    background: #fafafa;
+    border-radius: 8px;
+}
+
+#mensajes p {
+    margin: 5px 0;
+    padding: 3px 0;
+    border-bottom: 1px dotted #eee;
+    font-size: 0.9em;
+}
+
+/* Colores para los mensajes del JS */
+#mensajes p[style*="darkred"] { /* IA */
+    color: #8b0000 !important;
+}
+#mensajes p[style*="blue"] { /* Player */
+    font-weight: bold;
+    color: #00008b !important;
+}
+#mensajes p[style*="green"] { /* Ganador */
+    background-color: #e8f5e9;
+    padding: 5px;
+    border-radius: 4px;
+    font-weight: bold;
+}
