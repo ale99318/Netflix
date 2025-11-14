@@ -3,11 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Subasta de Futbolistas</title>
+    <title>Subasta Ciega de Futbolistas</title>
+    
     <link rel="stylesheet" href="style.css"> 
+    
+    <style>
+        /* Estilos esenciales para visibilidad */
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; }
+        #game-container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        #mensajes { max-height: 250px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; margin-top: 20px; background: #fafafa; border-radius: 8px; }
+        #controles-player { display: flex; gap: 10px; align-items: center; padding: 10px 0; }
+        #controles-player input, #controles-player button { padding: 8px; }
+    </style>
 </head>
 <body>
-    <h1>⚽ Subasta de Futbolistas</h1>
+    <h1>⚽ Subasta Ciega de Futbolistas</h1>
     
     <div id="game-container">
         
@@ -17,9 +27,10 @@
 
         <div id="controles-player">
             <h3>Tu Oferta (en millones de $)</h3>
-            <input type="number" id="input-puja" placeholder="Ej: 50">
-            <button onclick="pujarManual()" id="boton-puja">Pujar</button>
-            <button onclick="usarSalto()" id="boton-salto">Saltar Jugador (1 vez)</button>
+            <input type="number" id="input-puja" placeholder="Ej: 50" style="width: 100px;">
+            
+            <button id="boton-puja">Pujar</button>
+            <button id="boton-salto">Saltar Jugador (1 vez)</button>
         </div>
         
         <div id="mensajes"></div>
