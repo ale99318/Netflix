@@ -18,7 +18,7 @@ const PARTICIPANTES = {
     },
     ia1: { 
         id: 'ia1', 
-        nombre: 'IA Conservadora', 
+        nombre: 'Juancito', 
         presupuesto: 100000000, 
         equipo: [], 
         posicionesOcupadas: [],
@@ -28,7 +28,7 @@ const PARTICIPANTES = {
     },
     ia2: { 
         id: 'ia2', 
-        nombre: 'IA Agresiva', 
+        nombre: 'FelixDeportes', 
         presupuesto: 100000000, 
         equipo: [], 
         posicionesOcupadas: [],
@@ -172,9 +172,9 @@ function empezarTurno() {
             
             iniciarTemporizador();
             
-            // Si es turno de IA, ejecutar después de 2-5 segundos
+            // Si es turno de IA, ejecutar después de 5-8 segundos
             if (participanteId !== 'player') {
-                const tiempoEspera = Math.random() * 3000 + 2000; // 2-5 segundos
+                const tiempoEspera = Math.random() * 3000 + 5000; // 5-8 segundos
                 setTimeout(() => {
                     if (subastaActiva.participantesActivos[subastaActiva.turnoActual] === participanteId) {
                         ejecutarTurnoIA(participanteId);
@@ -272,7 +272,7 @@ function pujar(monto, postorId = 'player') {
     detenerTemporizador();
     subastaActiva.turnoActual = (subastaActiva.turnoActual + 1) % subastaActiva.participantesActivos.length;
     
-    setTimeout(() => empezarTurno(), 1500);
+    setTimeout(() => empezarTurno(), 2000); // 2 segundos de pausa entre turnos
 }
 
 function pujarManual() {
@@ -361,36 +361,42 @@ function revelarJugador() {
     const jugadorReal = subastaActiva.jugadorOculto;
     const precio = subastaActiva.ofertaActual;
 
-    mostrarMensaje(`<br>🥁 <b>¡REVELACIÓN!</b> El jugador era <b>${jugadorReal.nombre}</b> (Media: ${jugadorReal.media}, Puesto: ${jugadorReal.puesto})`, 'ganador');
+    mostrarMensaje(`<br>🥁🥁🥁 <b>¡REVELACIÓN!</b> 🥁🥁🥁`, 'ganador');
+    
+    // Pausa dramática de 2 segundos antes de revelar
+    setTimeout(() => {
+        mostrarMensaje(`<br>El jugador era... <b>${jugadorReal.nombre}</b>!`, 'ganador');
+        mostrarMensaje(`📊 Media: ${jugadorReal.media} | Puesto: ${jugadorReal.puesto}`, 'info');
 
-    if (subastaActiva.postorActualId === null || precio === 0) {
-        mostrarMensaje(`❌ Nadie lo quiso. ${jugadorReal.nombre} no se vendió.`, 'info');
-    } else {
-        const ganador = PARTICIPANTES[subastaActiva.postorActualId];
+        if (subastaActiva.postorActualId === null || precio === 0) {
+            mostrarMensaje(`❌ Nadie lo quiso. ${jugadorReal.nombre} no se vendió.`, 'info');
+        } else {
+            const ganador = PARTICIPANTES[subastaActiva.postorActualId];
 
-        ganador.presupuesto -= precio;
-        ganador.equipo.push({ 
-            nombre: jugadorReal.nombre, 
-            media: jugadorReal.media, 
-            puesto: jugadorReal.puesto,
-            precio: precio
-        });
-        ganador.posicionesOcupadas.push(jugadorReal.puesto);
-        
-        if (typeof TODOS_LOS_JUGADORES !== 'undefined') {
-            const jugadorGlobal = TODOS_LOS_JUGADORES.find(j => j.id === jugadorReal.id);
-            if (jugadorGlobal) jugadorGlobal.vendido = true;
+            ganador.presupuesto -= precio;
+            ganador.equipo.push({ 
+                nombre: jugadorReal.nombre, 
+                media: jugadorReal.media, 
+                puesto: jugadorReal.puesto,
+                precio: precio
+            });
+            ganador.posicionesOcupadas.push(jugadorReal.puesto);
+            
+            if (typeof TODOS_LOS_JUGADORES !== 'undefined') {
+                const jugadorGlobal = TODOS_LOS_JUGADORES.find(j => j.id === jugadorReal.id);
+                if (jugadorGlobal) jugadorGlobal.vendido = true;
+            }
+
+            mostrarMensaje(`🏆 ¡<b>${ganador.nombre}</b> ganó y pagó <b>${formatoDinero(precio)}</b>! Posición ocupada: ${jugadorReal.puesto}`, 'ganador');
         }
-
-        mostrarMensaje(`🏆 ¡<b>${ganador.nombre}</b> ganó y pagó <b>${formatoDinero(precio)}</b>! Posición ocupada: ${jugadorReal.puesto}`, 'ganador');
-    }
-    
-    subastaActiva.revelacionPendiente = false;
-    subastaActiva.jugadorOculto = null;
-    subastaActiva.jugadorPublico = null;
-    actualizarInterfaz();
-    
-    setTimeout(iniciarSiguienteSubasta, 3000); 
+        
+        subastaActiva.revelacionPendiente = false;
+        subastaActiva.jugadorOculto = null;
+        subastaActiva.jugadorPublico = null;
+        actualizarInterfaz();
+        
+        setTimeout(iniciarSiguienteSubasta, 4000); // Más tiempo antes de la siguiente subasta
+    }, 2000); // Pausa dramática
 }
 
 function iniciarSiguienteSubasta() {
