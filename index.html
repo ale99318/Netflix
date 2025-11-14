@@ -11,7 +11,7 @@
         /* Estilos esenciales para visibilidad */
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; }
         #game-container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        #mensajes { max-height: 250px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; margin-top: 20px; background: #fafafa; border-radius: 8px; }
+        #log-subasta { max-height: 250px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; margin-top: 20px; background: #fafafa; border-radius: 8px; }
         #controles-player { display: flex; gap: 10px; align-items: center; padding: 10px 0; }
         #controles-player input, #controles-player button { padding: 8px; }
     </style>
@@ -24,21 +24,19 @@
         <div id="info-participantes"></div>
         
         <div id="info-subasta"></div>
-
+        
         <div id="controles-player">
-            <h3>Tu Oferta (en millones de $)</h3>
+            <label for="input-puja"><h3>Tu Oferta (en millones de $)</h3></label>
             <input type="number" id="input-puja" placeholder="Ej: 50" style="width: 100px;">
             
-            <button id="boton-puja">Pujar</button>
-            <button id="boton-salto">Saltar Jugador (1 vez)</button>
+            <button id="boton-puja" onclick="pujarManual()">Pujar</button>
+            <button id="boton-salto" onclick="usarSalto()">Saltar Jugador (1 vez)</button>
         </div>
         
-        <div id="mensajes"></div>
-
+        <div id="log-subasta"></div>
     </div>
-
-    <script src="jugadores.js"></script>
     
+    <script src="jugadores.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
