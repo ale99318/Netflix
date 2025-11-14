@@ -51,7 +51,7 @@ function mostrarMensaje(texto, tipo = 'normal') {
     if (!log) return;
     
     const mensaje = document.createElement('p');
-    mensaje.textContent = texto;
+    mensaje.innerHTML = texto;
     
     if (tipo === 'ganador') mensaje.style.color = '#4CAF50';
     if (tipo === 'info') mensaje.style.color = '#2196F3';
@@ -72,6 +72,7 @@ function gestionarTurnoIA(iaId) {
     const precioSugerido = subastaActiva.jugadorOculto.precio_sugerido;
     const topePuja = iaId === 'ia1' ? subastaActiva.topePujaIA1 : subastaActiva.topePujaIA2;
 
+    // Si ya pasó, no hace nada
     if (subastaActiva.participantesQuePasaron.includes(iaId)) {
         return; 
     }
@@ -80,7 +81,7 @@ function gestionarTurnoIA(iaId) {
     const probabilidadSalto = ia.perfil === 'conservadora' ? 0.15 : 0.25;
     if (!ia.salto_usado && Math.random() < probabilidadSalto && subastaActiva.ofertaActual > precioSugerido * 0.7) {
         ia.salto_usado = true;
-        mostrarMensaje(`⏭️ [${ia.nombre}] usa su SALTO y pasa esta subasta.`, 'alerta');
+        mostrarMensaje(`⏭️ <b>[${ia.nombre}]</b> usa su SALTO y pasa esta subasta.`, 'alerta');
         subastaActiva.participantesQuePasaron.push(iaId);
         verificarFinSubasta();
         return;
@@ -89,21 +90,23 @@ function gestionarTurnoIA(iaId) {
     // Decidir si puja o pasa
     const ofertaMinima = subastaActiva.ofertaActual + 1000000;
     
+    // Si no puede pujar más, se retira
     if (ofertaMinima > topePuja || ofertaMinima > ia.presupuesto) {
-        mostrarMensaje(`🚫 [${ia.nombre}] se retira de la puja.`);
+        mostrarMensaje(`🚫 <b>[${ia.nombre}]</b> se retira de la puja.`);
         subastaActiva.participantesQuePasaron.push(iaId);
         verificarFinSubasta();
         return;
     }
 
-    // Calcular nueva oferta
-    let incremento = Math.floor(Math.random() * 3 + 1) * 1000000;
+    // Calcular nueva oferta con variación
+    let incrementoBase = Math.floor(Math.random() * 3 + 1) * 1000000;
     if (ia.perfil === 'agresiva') {
-        incremento = Math.floor(Math.random() * 5 + 2) * 1000000;
+        incrementoBase = Math.floor(Math.random() * 5 + 2) * 1000000;
     }
     
-    const nuevaOferta = Math.min(ofertaMinima + incremento, topePuja, ia.presupuesto);
+    const nuevaOferta = Math.min(ofertaMinima + incrementoBase, topePuja, ia.presupuesto);
     
+    // La IA puja
     pujar(nuevaOferta, iaId);
 }
 
@@ -132,18 +135,20 @@ function pujar(monto, postorId = 'player') {
     postor.ultimaPuja = monto;
 
     // Resetear los que pasaron excepto el actual postor
-    subastaActiva.participantesQuePasaron = subastaActiva.participantesActivos.filter(id => id !== postorId);
+    subastaActiva.participantesQuePasaron = [];
 
     actualizarInterfaz();
-    mostrarMensaje(`📈 [${postor.nombre}] puja con **${formatoDinero(monto)}**.`);
+    mostrarMensaje(`📈 <b>[${postor.nombre}]</b> puja con <b>${formatoDinero(monto)}</b>.`);
 
+    // Si el jugador humano puja, las IAs responden
     if (postorId === 'player') {
         setTimeout(() => gestionarTurnoIA('ia1'), 1500); 
         setTimeout(() => gestionarTurnoIA('ia2'), 3000); 
+    } else {
+        // Si una IA pujó, la otra IA responde
+        const otraIA = postorId === 'ia1' ? 'ia2' : 'ia1';
+        setTimeout(() => gestionarTurnoIA(otraIA), 1500);
     }
-    
-    clearTimeout(subastaActiva.timerFinSubasta);
-    subastaActiva.timerFinSubasta = setTimeout(verificarFinSubasta, 4500); 
 }
 
 function pujarManual() {
@@ -177,29 +182,31 @@ function usarSalto() {
     mostrarMensaje('⏭️ Has usado tu SALTO. Pasas esta subasta.', 'alerta');
     
     actualizarInterfaz();
-    verificarFinSubasta();
+    
+    // Las IAs siguen pujando entre ellas
+    setTimeout(() => gestionarTurnoIA('ia1'), 1000);
+    setTimeout(() => gestionarTurnoIA('ia2'), 2000);
 }
 
 function verificarFinSubasta() {
     clearTimeout(subastaActiva.timerFinSubasta);
     if (!subastaActiva.jugadorOculto || subastaActiva.revelacionPendiente) return;
 
-    // Condición de fin
-    if (subastaActiva.participantesQuePasaron.length === subastaActiva.participantesActivos.length ||
-        (subastaActiva.postorActualId !== null && subastaActiva.participantesQuePasaron.length === subastaActiva.participantesActivos.length - 1)) 
-    {
+    const participantesActivos = subastaActiva.participantesActivos.length;
+    const participantesQuePasaron = subastaActiva.participantesQuePasaron.length;
+
+    // Condición de fin: Todos pasaron O solo queda uno activo
+    if (participantesQuePasaron >= participantesActivos - 1) {
+         // Si nadie pujó o la oferta es muy baja
          if(subastaActiva.postorActualId === null || subastaActiva.ofertaActual <= subastaActiva.jugadorOculto.precio_sugerido * 0.1) {
              subastaActiva.postorActualId = null;
          }
          
+         // Entramos en la FASE DE PAUSA/REVELACIÓN
          subastaActiva.revelacionPendiente = true;
-         mostrarMensaje("🔒 --- SUBASTA CERRADA --- Presiona REVELAR JUGADOR para ver el resultado.", 'info');
+         mostrarMensaje("🔒 <b>--- SUBASTA CERRADA ---</b> Presiona REVELAR JUGADOR para ver el resultado.", 'info');
          actualizarInterfaz();
          return;
-    }
-
-    if (!subastaActiva.participantesQuePasaron.includes('player')) {
-        mostrarMensaje('🎯 Es tu turno. Puedes pujar o usar tu salto.', 'info');
     }
 }
 
@@ -213,7 +220,7 @@ function revelarJugador() {
     const jugadorReal = subastaActiva.jugadorOculto;
     const precio = subastaActiva.ofertaActual;
 
-    mostrarMensaje(`🥁 ¡REVELACIÓN! El jugador era **${jugadorReal.nombre}** (Media: ${jugadorReal.media}, Puesto: ${jugadorReal.puesto})`, 'ganador');
+    mostrarMensaje(`🥁 <b>¡REVELACIÓN!</b> El jugador era <b>${jugadorReal.nombre}</b> (Media: ${jugadorReal.media}, Puesto: ${jugadorReal.puesto})`, 'ganador');
 
     if (subastaActiva.postorActualId === null || precio === 0) {
         mostrarMensaje(`❌ Nadie lo quiso. ${jugadorReal.nombre} no se vendió.`, 'info');
@@ -233,7 +240,7 @@ function revelarJugador() {
             if (jugadorGlobal) jugadorGlobal.vendido = true;
         }
 
-        mostrarMensaje(`🏆 ¡${ganador.nombre} ganó la subasta y pagó ${formatoDinero(precio)}!`, 'ganador');
+        mostrarMensaje(`🏆 ¡<b>${ganador.nombre}</b> ganó la subasta y pagó <b>${formatoDinero(precio)}</b>!`, 'ganador');
     }
     
     subastaActiva.revelacionPendiente = false;
@@ -254,7 +261,8 @@ function iniciarSiguienteSubasta() {
     const disponibles = TODOS_LOS_JUGADORES.filter(j => !j.vendido);
     
     if (disponibles.length === 0) {
-        mostrarMensaje('🎉 ¡JUEGO TERMINADO! Todos los jugadores han sido subastados.', 'ganador');
+        mostrarMensaje('🎉 <b>¡JUEGO TERMINADO!</b> Todos los jugadores han sido subastados.', 'ganador');
+        mostrarResumenFinal();
         return;
     }
 
@@ -277,8 +285,29 @@ function iniciarSiguienteSubasta() {
     subastaActiva.topePujaIA2 = calcularTopePuja('agresiva', jugadorSeleccionado.precio_sugerido);
     
     actualizarInterfaz();
-    mostrarMensaje(`--- 🏁 INICIO DE TURNO --- Se sortearon 4 jugadores.`, 'info');
-    mostrarMensaje(`📢 Subasta por **Jugador Misterioso** (${jugadorSeleccionado.puesto}) - Precio Sugerido: ${formatoDinero(jugadorSeleccionado.precio_sugerido)}`, 'info');
+    mostrarMensaje(`<br>--- 🏁 <b>INICIO DE TURNO</b> ---`, 'info');
+    mostrarMensaje(`📢 Subasta por <b>Jugador Misterioso (${jugadorSeleccionado.puesto})</b> - Precio Sugerido: ${formatoDinero(jugadorSeleccionado.precio_sugerido)}`, 'info');
+    
+    // Las IAs empiezan a pujar automáticamente después de un momento
+    setTimeout(() => {
+        if (Math.random() > 0.3) { // 70% de probabilidad que una IA empiece
+            const iaInicial = Math.random() > 0.5 ? 'ia1' : 'ia2';
+            const ofertaInicial = Math.max(
+                Math.floor(jugadorSeleccionado.precio_sugerido * 0.3 / 1000000) * 1000000,
+                1000000
+            );
+            pujar(ofertaInicial, iaInicial);
+        }
+    }, 2000);
+}
+
+function mostrarResumenFinal() {
+    mostrarMensaje('<br>=== 📊 <b>RESUMEN FINAL</b> ===', 'ganador');
+    
+    Object.values(PARTICIPANTES).forEach(p => {
+        const totalGastado = 100000000 - p.presupuesto;
+        mostrarMensaje(`<b>${p.nombre}</b>: ${p.equipo.length} jugadores - Gastó: ${formatoDinero(totalGastado)} - Restante: ${formatoDinero(p.presupuesto)}`, 'info');
+    });
 }
 
 // =======================================================
@@ -333,8 +362,9 @@ window.verificarFinSubasta = verificarFinSubasta;
 // Inicialización del juego
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof TODOS_LOS_JUGADORES === 'undefined' || TODOS_LOS_JUGADORES.length === 0) {
-        mostrarMensaje('⚠️ ADVERTENCIA: No se encontró la lista de jugadores (TODOS_LOS_JUGADORES). Asegúrate de cargar datos.js antes que script.js', 'alerta');
+        mostrarMensaje('⚠️ <b>ADVERTENCIA:</b> No se encontró la lista de jugadores (TODOS_LOS_JUGADORES). Asegúrate de cargar jugadores.js antes que script.js', 'alerta');
     } else {
+        mostrarMensaje('✅ Juego cargado correctamente. ¡Preparando primera subasta!', 'info');
         iniciarSiguienteSubasta(); 
     }
 });
