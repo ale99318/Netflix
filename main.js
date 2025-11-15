@@ -3,47 +3,122 @@
 // =======================================================
 
 // 1. Importar funciones de la interfaz y lógica de acción
-import { actualizarInterfaz, revelarJugador, pujarConAumento, usarSalto } from './interfaz.js';
+import { 
+    actualizarInterfaz, 
+    revelarJugador, 
+    pujarConAumento, 
+    usarSalto 
+} from './interfaz.js';
+
 // 2. Importar funciones de flujo
 import { iniciarSiguienteSubasta } from './subasta.js';
 import { ejecutarTurnoIA } from './ia.js';
-// 3. Importar TODAS las utilidades (formato, log, equipo)
-import { mostrarEquipo, formatoDinero, mostrarMensaje } from './utils.js'; 
 
+// 3. Importar utilidades
+import { 
+    mostrarEquipo, 
+    formatoDinero, 
+    mostrarMensaje 
+} from './utils.js';
 
-// --- Exponer funciones al Ámbito Global (Window) ---
-// Esto es CRUCIAL para que:
-// 1. El HTML pueda llamar a funciones con 'onclick'.
-// 2. Módulos con dependencia circular (como temporizador/turnos llamando a interfaz) puedan comunicarse.
+// 4. IMPORTAR JUGADORES (CRÍTICO)
+import { TODOS_LOS_JUGADORES } from './jugadores.js';
 
-// 3A. Exponer funciones de Interfaz y Flujo de Juego
-window.actualizarInterfaz = actualizarInterfaz;
-window.revelarJugador = revelarJugador;
-window.pujarConAumento = pujarConAumento;
-window.usarSalto = usarSalto;
-window.iniciarSiguienteSubasta = iniciarSiguienteSubasta;
-window.ejecutarTurnoIA = ejecutarTurnoIA;
+// --- Validación de Importaciones ---
+function validarImportaciones() {
+    const funcionesRequeridas = {
+        'actualizarInterfaz': actualizarInterfaz,
+        'revelarJugador': revelarJugador,
+        'pujarConAumento': pujarConAumento,
+        'usarSalto': usarSalto,
+        'iniciarSiguienteSubasta': iniciarSiguienteSubasta,
+        'ejecutarTurnoIA': ejecutarTurnoIA,
+        'mostrarEquipo': mostrarEquipo,
+        'formatoDinero': formatoDinero,
+        'mostrarMensaje': mostrarMensaje
+    };
+    
+    for (const [nombre, funcion] of Object.entries(funcionesRequeridas)) {
+        if (typeof funcion !== 'function') {
+            throw new Error(`❌ Fallo al importar: ${nombre}`);
+        }
+    }
+    
+    if (!Array.isArray(TODOS_LOS_JUGADORES) || TODOS_LOS_JUGADORES.length === 0) {
+        throw new Error('❌ Lista de jugadores inválida o vacía');
+    }
+    
+    return true;
+}
 
-// 3B. Exponer las Utilidades (CORRECCIÓN CRÍTICA)
-// Las utilidades se agrupan bajo 'window.utils' para que otros módulos
-// (como subasta.js, ia.js, etc.) puedan acceder al log y al formato.
-window.utils = {
-    mostrarEquipo: mostrarEquipo,
-    formatoDinero: formatoDinero,
-    // La función que causaba el error de TypeError
-    mostrarMensaje: mostrarMensaje 
-};
+// --- Exponer funciones al Ámbito Global ---
+// Necesario para onclick en HTML y comunicación entre módulos
+
+function exponerAPI() {
+    // 3A. Funciones de Interfaz y Flujo
+    window.actualizarInterfaz = actualizarInterfaz;
+    window.revelarJugador = revelarJugador;
+    window.pujarConAumento = pujarConAumento;
+    window.usarSalto = usarSalto;
+    window.iniciarSiguienteSubasta = iniciarSiguienteSubasta;
+    window.ejecutarTurnoIA = ejecutarTurnoIA;
+    
+    // 3B. Utilidades agrupadas
+    window.utils = {
+        mostrarEquipo,
+        formatoDinero,
+        mostrarMensaje
+    };
+    
+    // 3C. Datos (opcional, para debugging)
+    if (process.env.NODE_ENV === 'development') {
+        window.JUGADORES_DEBUG = TODOS_LOS_JUGADORES;
+    }
+}
 
 // --- Inicialización del Juego ---
 document.addEventListener('DOMContentLoaded', () => {
-    // Verificar si la lista de jugadores está disponible (asumiendo que jugadores.js se carga primero)
-    if (typeof TODOS_LOS_JUGADORES === 'undefined' || TODOS_LOS_JUGADORES.length === 0) {
-        // Usamos la función globalmente expuesta para el mensaje de error
-        window.utils.mostrarMensaje('⚠️ <b>ERROR:</b> No se encontró la lista de jugadores. Verifica que jugadores.js se cargue antes.', 'alerta');
-    } else {
-        window.utils.mostrarMensaje('✅ Juego cargado. ¡Empezando Subasta!', 'info');
+    try {
+        // Validar que todo se importó correctamente
+        validarImportaciones();
         
-        // Usamos un pequeño retraso para que los mensajes de inicio se vean
-        setTimeout(window.iniciarSiguienteSubasta, 1000);
+        // Exponer API al ámbito global
+        exponerAPI();
+        
+        // Mensaje de éxito
+        mostrarMensaje('✅ Juego cargado correctamente', 'info');
+        mostrarMensaje(
+            `🎮 ${TODOS_LOS_JUGADORES.length} jugadores disponibles. ¡Comenzando subasta!`, 
+            'info'
+        );
+        
+        // Iniciar la primera subasta con pequeño delay
+        setTimeout(() => {
+            iniciarSiguienteSubasta();
+        }, 1500);
+        
+    } catch (error) {
+        // Manejo de errores robusto
+        console.error('Error al inicializar el juego:', error);
+        
+        const mensajeError = `
+            ⚠️ <b>ERROR DE INICIALIZACIÓN:</b><br>
+            ${error.message}<br>
+            <small>Verifica la consola del navegador para más detalles.</small>
+        `;
+        
+        // Mostrar error incluso si utils falla
+        const contenedorMensajes = document.getElementById('mensajes');
+        if (contenedorMensajes) {
+            const div = document.createElement('div');
+            div.className = 'mensaje alerta';
+            div.innerHTML = mensajeError;
+            contenedorMensajes.appendChild(div);
+        } else {
+            alert(error.message);
+        }
     }
 });
+
+// Exportar validación para tests (opcional)
+export { validarImportaciones, exponerAPI };
