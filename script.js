@@ -12,7 +12,7 @@ const PARTICIPANTES = {
     player: { 
         id: 'player', 
         nombre: 'Jugador Humano', 
-        presupuesto: 100000000, 
+        presupuesto: 1000000000, 
         equipo: [], 
         posicionesOcupadas: [],
         salto_usado: false
@@ -20,7 +20,7 @@ const PARTICIPANTES = {
     ia1: { 
         id: 'ia1', 
         nombre: 'Juancito', 
-        presupuesto: 100000000, 
+        presupuesto: 1000000000, 
         equipo: [], 
         posicionesOcupadas: [],
         perfil: 'conservadora', 
@@ -29,7 +29,7 @@ const PARTICIPANTES = {
     ia2: { 
         id: 'ia2', 
         nombre: 'FelixDeportes', 
-        presupuesto: 100000000, 
+        presupuesto: 1000000000, 
         equipo: [], 
         posicionesOcupadas: [],
         perfil: 'agresiva', 
