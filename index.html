@@ -3,40 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Subasta Ciega de Futbolistas</title>
+    <title>⚽ Simulación de Subasta de Fútbol</title>
     
-    <link rel="stylesheet" href="style.css"> 
+    <link rel="stylesheet" href="styles.css"> 
     
-    <style>
-        /* Estilos esenciales para visibilidad */
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; }
-        #game-container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        #log-subasta { max-height: 250px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; margin-top: 20px; background: #fafafa; border-radius: 8px; }
-        #controles-player { display: flex; gap: 10px; align-items: center; padding: 10px 0; }
-        #controles-player input, #controles-player button { padding: 8px; }
-    </style>
 </head>
 <body>
-    <h1>⚽ Subasta Ciega de Futbolistas</h1>
-    
-    <div id="game-container">
+
+    <h1>🏆 Simulación de Subasta de Fútbol</h1>
+
+    <div class="container">
         
-        <div id="info-participantes"></div>
-        
-        <div id="info-subasta"></div>
-        
-        <div id="controles-player">
-            <label for="input-puja"><h3>Tu Oferta (en millones de $)</h3></label>
-            <input type="number" id="input-puja" placeholder="Ej: 50" style="width: 100px;">
-            
-            <button id="boton-puja" onclick="pujarManual()">Pujar</button>
-            <button id="boton-salto" onclick="usarSalto()">Saltar Jugador (1 vez)</button>
+        <div id="info-subasta" class="column">
+            <h2>Cargando...</h2>
         </div>
-        
-        <div id="log-subasta"></div>
+
+        <div id="info-participantes" class="column">
+            <h3>Cargando Datos...</h3>
+        </div>
+
     </div>
     
-    <script src="jugadores.js"></script>
-    <script src="script.js"></script>
+    <div id="log-subasta">
+        <p style="color: #666;">Iniciando sesión de subasta...</p>
+    </div>
+
+    <script src="jugadores.js"></script> 
+    
+    <script type="module" src="main.js"></script> 
+
 </body>
 </html>
