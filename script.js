@@ -1,10 +1,12 @@
 // =======================================================
-// script.js - SUBASTA POR TURNOS CON TEMPORIZADOR Y POSICIONES
+// SUBASTA POR RONDAS DE POSICIÓN (N+1 Jugadores)
 // =======================================================
 
-// --- 1. DATOS Y ESTADO DEL JUEGO -----------------------
+// --- 1. CONFIGURACIÓN ---
 
 const POSICIONES_REQUERIDAS = ['POR', 'LI', 'DFC', 'LD', 'MCD', 'MC', 'EI', 'ED', 'MP', 'DC', 'EXT'];
+const NUM_PARTICIPANTES = 3;
+const JUGADORES_POR_POSICION = NUM_PARTICIPANTES + 1; // 4 jugadores por posición
 
 const PARTICIPANTES = {
     player: { 
@@ -13,8 +15,7 @@ const PARTICIPANTES = {
         presupuesto: 100000000, 
         equipo: [], 
         posicionesOcupadas: [],
-        salto_usado: false, 
-        ultimaPuja: 0 
+        salto_usado: false
     },
     ia1: { 
         id: 'ia1', 
@@ -23,8 +24,7 @@ const PARTICIPANTES = {
         equipo: [], 
         posicionesOcupadas: [],
         perfil: 'conservadora', 
-        salto_usado: false, 
-        ultimaPuja: 0 
+        salto_usado: false
     },
     ia2: { 
         id: 'ia2', 
@@ -33,24 +33,30 @@ const PARTICIPANTES = {
         equipo: [], 
         posicionesOcupadas: [],
         perfil: 'agresiva', 
-        salto_usado: false, 
-        ultimaPuja: 0 
+        salto_usado: false
     }
 };
 
-// B. ESTADO DE LA SUBASTA
-let subastaActiva = {
-    jugadorOculto: null,     
-    jugadorPublico: null,    
-    ofertaActual: 0,         
-    postorActualId: null,    
-    topePujaIA1: 0,          
+// --- 2. ESTADO DEL JUEGO ---
+
+let estadoJuego = {
+    posicionActualIndex: 0,
+    posicionActual: null,
+    jugadoresSubastadosEnRonda: 0,
+    jugadoresDisponiblesRonda: [],
+    
+    // Subasta individual actual
+    jugadorOculto: null,
+    jugadorPublico: null,
+    ofertaActual: 0,
+    postorActualId: null,
+    topePujaIA1: 0,
     topePujaIA2: 0,
     
     // Sistema de turnos
-    turnoActual: 0, // 0=player, 1=ia1, 2=ia2
+    turnoActual: 0,
     ordenTurnos: ['player', 'ia1', 'ia2'],
-    participantesActivos: [], // Solo los que pueden pujar por esta posición
+    participantesActivos: [],
     participantesQuePasaron: [],
     
     // Temporizador
@@ -58,10 +64,10 @@ let subastaActiva = {
     intervalTemporizador: null,
     
     revelacionPendiente: false,
-    rondaActual: 0
+    revelacionEnProceso: false
 };
 
-// --- 2. FUNCIONES DE UTILIDAD ---
+// --- 3. UTILIDADES ---
 
 function formatoDinero(num) {
     if (num === null || num === undefined) return '$0.0M';
@@ -70,15 +76,22 @@ function formatoDinero(num) {
     return `${sign}$${(absNum / 1000000).toFixed(1)}M`;
 }
 
-function calcularTopePuja(perfil, precioSugerido) {
+function calcularTopePuja(perfil, precioSugerido, jugadoresRestantes, participantesRestantes) {
     let factor;
-    if (perfil === 'conservadora') {
-        factor = Math.random() * (0.95 - 0.60) + 0.60;
+    
+    // Si es situación crítica (último jugador o pocos restantes)
+    if (jugadoresRestantes <= participantesRestantes) {
+        factor = perfil === 'conservadora' ? 
+            Math.random() * (1.10 - 0.90) + 0.90 : 
+            Math.random() * (1.30 - 1.00) + 1.00;
     } else {
-        factor = Math.random() * (1.20 - 0.90) + 0.90;
+        factor = perfil === 'conservadora' ? 
+            Math.random() * (0.95 - 0.60) + 0.60 : 
+            Math.random() * (1.20 - 0.90) + 0.90;
     }
+    
     const topeBruto = precioSugerido * factor;
-    return Math.floor(topeBruto / 1000000) * 1000000; 
+    return Math.floor(topeBruto / 1000000) * 1000000;
 }
 
 function mostrarMensaje(texto, tipo = 'normal') {
@@ -87,33 +100,42 @@ function mostrarMensaje(texto, tipo = 'normal') {
     
     const mensaje = document.createElement('p');
     mensaje.innerHTML = texto;
+    mensaje.style.margin = '5px 0';
     
     if (tipo === 'ganador') mensaje.style.color = '#4CAF50';
     if (tipo === 'info') mensaje.style.color = '#2196F3';
     if (tipo === 'alerta') mensaje.style.color = '#FF9800';
     if (tipo === 'turno') mensaje.style.fontWeight = 'bold';
+    if (tipo === 'ronda') {
+        mensaje.style.fontWeight = 'bold';
+        mensaje.style.fontSize = '1.2em';
+        mensaje.style.color = '#9C27B0';
+    }
     
     log.appendChild(mensaje);
     log.scrollTop = log.scrollHeight;
 }
 
 function necesitaPosicion(participanteId, posicion) {
-    const p = PARTICIPANTES[participanteId];
-    return !p.posicionesOcupadas.includes(posicion);
+    return !PARTICIPANTES[participanteId].posicionesOcupadas.includes(posicion);
 }
 
-// --- 3. SISTEMA DE TEMPORIZADOR ---
+function contarParticipantesNecesitanPosicion(posicion) {
+    return estadoJuego.ordenTurnos.filter(id => necesitaPosicion(id, posicion)).length;
+}
+
+// --- 4. SISTEMA DE TEMPORIZADOR ---
 
 function iniciarTemporizador() {
     detenerTemporizador();
-    subastaActiva.tiempoRestante = 10;
+    estadoJuego.tiempoRestante = 10;
     actualizarInterfaz();
     
-    subastaActiva.intervalTemporizador = setInterval(() => {
-        subastaActiva.tiempoRestante--;
+    estadoJuego.intervalTemporizador = setInterval(() => {
+        estadoJuego.tiempoRestante--;
         actualizarInterfaz();
         
-        if (subastaActiva.tiempoRestante <= 0) {
+        if (estadoJuego.tiempoRestante <= 0) {
             detenerTemporizador();
             pasarTurno();
         }
@@ -121,62 +143,142 @@ function iniciarTemporizador() {
 }
 
 function detenerTemporizador() {
-    if (subastaActiva.intervalTemporizador) {
-        clearInterval(subastaActiva.intervalTemporizador);
-        subastaActiva.intervalTemporizador = null;
+    if (estadoJuego.intervalTemporizador) {
+        clearInterval(estadoJuego.intervalTemporizador);
+        estadoJuego.intervalTemporizador = null;
     }
 }
 
-function reiniciarTemporizador() {
-    subastaActiva.tiempoRestante = 10;
-    iniciarTemporizador();
-}
+// --- 5. INICIAR RONDA DE POSICIÓN ---
 
-// --- 4. SISTEMA DE TURNOS ---
-
-function iniciarTurnos() {
-    const posicion = subastaActiva.jugadorOculto.puesto;
-    
-    // Determinar quién puede participar (solo los que necesitan esta posición)
-    subastaActiva.participantesActivos = subastaActiva.ordenTurnos.filter(id => 
-        necesitaPosicion(id, posicion)
-    );
-    
-    if (subastaActiva.participantesActivos.length === 0) {
-        mostrarMensaje('⚠️ Todos ya tienen esta posición. Pasando al siguiente jugador...', 'alerta');
-        setTimeout(() => {
-            subastaActiva.revelacionPendiente = true;
-            subastaActiva.postorActualId = null;
-            revelarJugador();
-        }, 2000);
+function iniciarRondaPosicion() {
+    if (estadoJuego.posicionActualIndex >= POSICIONES_REQUERIDAS.length) {
+        mostrarMensaje('🎉🎉🎉 <b>¡JUEGO COMPLETADO!</b> Todas las posiciones han sido cubiertas.', 'ganador');
+        mostrarResumenFinal();
         return;
     }
     
-    subastaActiva.participantesQuePasaron = [];
-    subastaActiva.turnoActual = 0;
+    estadoJuego.posicionActual = POSICIONES_REQUERIDAS[estadoJuego.posicionActualIndex];
+    estadoJuego.jugadoresSubastadosEnRonda = 0;
+    
+    // Obtener jugadores disponibles de esta posición
+    if (typeof TODOS_LOS_JUGADORES === 'undefined') {
+        mostrarMensaje('❌ ERROR: No se encontró TODOS_LOS_JUGADORES', 'alerta');
+        return;
+    }
+    
+    estadoJuego.jugadoresDisponiblesRonda = TODOS_LOS_JUGADORES.filter(j => 
+        j.puesto === estadoJuego.posicionActual && !j.vendido
+    );
+    
+    if (estadoJuego.jugadoresDisponiblesRonda.length < JUGADORES_POR_POSICION) {
+        mostrarMensaje(`⚠️ Solo hay ${estadoJuego.jugadoresDisponiblesRonda.length} jugadores de ${estadoJuego.posicionActual}. Saltando...`, 'alerta');
+        estadoJuego.posicionActualIndex++;
+        setTimeout(iniciarRondaPosicion, 2000);
+        return;
+    }
+    
+    const participantesNecesitan = contarParticipantesNecesitanPosicion(estadoJuego.posicionActual);
+    
+    mostrarMensaje(`<br>═══════════════════════════════════════`, 'ronda');
+    mostrarMensaje(`🏆 <b>NUEVA RONDA: ${estadoJuego.posicionActual}</b>`, 'ronda');
+    mostrarMensaje(`📊 Se subastarán ${JUGADORES_POR_POSICION} jugadores`, 'info');
+    mostrarMensaje(`👥 ${participantesNecesitan} participantes necesitan esta posición`, 'info');
+    mostrarMensaje(`═══════════════════════════════════════<br>`, 'ronda');
+    
+    setTimeout(() => iniciarSubastaIndividual(), 2000);
+}
+
+// --- 6. SUBASTA INDIVIDUAL ---
+
+function iniciarSubastaIndividual() {
+    // Verificar si la ronda terminó
+    if (estadoJuego.jugadoresSubastadosEnRonda >= JUGADORES_POR_POSICION) {
+        finalizarRondaPosicion();
+        return;
+    }
+    
+    // Verificar si todos ya tienen la posición
+    const participantesNecesitan = contarParticipantesNecesitanPosicion(estadoJuego.posicionActual);
+    if (participantesNecesitan === 0) {
+        finalizarRondaPosicion();
+        return;
+    }
+    
+    // Seleccionar jugador aleatorio de los disponibles
+    const disponibles = estadoJuego.jugadoresDisponiblesRonda.filter(j => !j.vendido);
+    if (disponibles.length === 0) {
+        finalizarRondaPosicion();
+        return;
+    }
+    
+    const jugadorSeleccionado = disponibles[Math.floor(Math.random() * disponibles.length)];
+    
+    // Configurar subasta
+    estadoJuego.jugadorOculto = jugadorSeleccionado;
+    estadoJuego.jugadorPublico = {
+        puesto: jugadorSeleccionado.puesto,
+        precio_sugerido: jugadorSeleccionado.precio_sugerido
+    };
+    estadoJuego.ofertaActual = 0;
+    estadoJuego.postorActualId = null;
+    estadoJuego.participantesQuePasaron = [];
+    estadoJuego.revelacionPendiente = false;
+    estadoJuego.revelacionEnProceso = false;
+    
+    // Calcular jugadores restantes y participantes que aún necesitan
+    const jugadoresRestantes = disponibles.length;
+    const participantesRestantes = participantesNecesitan;
+    
+    // Calcular topes para IAs (ajustados según urgencia)
+    estadoJuego.topePujaIA1 = calcularTopePuja('conservadora', jugadorSeleccionado.precio_sugerido, jugadoresRestantes, participantesRestantes);
+    estadoJuego.topePujaIA2 = calcularTopePuja('agresiva', jugadorSeleccionado.precio_sugerido, jugadoresRestantes, participantesRestantes);
+    
+    mostrarMensaje(`<br>--- 📢 <b>SUBASTA ${estadoJuego.jugadoresSubastadosEnRonda + 1}/${JUGADORES_POR_POSICION}</b> de ${estadoJuego.posicionActual} ---`, 'info');
+    mostrarMensaje(`🎭 Jugador Misterioso | 💰 Precio Sugerido: ${formatoDinero(jugadorSeleccionado.precio_sugerido)}`, 'info');
+    mostrarMensaje(`📊 Quedan ${jugadoresRestantes} jugadores | ${participantesRestantes} participantes sin posición`, 'alerta');
+    
+    actualizarInterfaz();
+    
+    setTimeout(() => iniciarTurnos(), 2000);
+}
+
+// --- 7. SISTEMA DE TURNOS ---
+
+function iniciarTurnos() {
+    // Filtrar solo los que necesitan esta posición
+    estadoJuego.participantesActivos = estadoJuego.ordenTurnos.filter(id => 
+        necesitaPosicion(id, estadoJuego.posicionActual)
+    );
+    
+    if (estadoJuego.participantesActivos.length === 0) {
+        cerrarSubasta();
+        return;
+    }
+    
+    estadoJuego.participantesQuePasaron = [];
+    estadoJuego.turnoActual = 0;
     
     empezarTurno();
 }
 
 function empezarTurno() {
-    if (subastaActiva.revelacionPendiente) return;
+    if (estadoJuego.revelacionPendiente) return;
     
-    // Encontrar el siguiente participante activo que no haya pasado
     let intentos = 0;
-    while (intentos < subastaActiva.participantesActivos.length) {
-        const participanteId = subastaActiva.participantesActivos[subastaActiva.turnoActual];
+    while (intentos < estadoJuego.participantesActivos.length) {
+        const participanteId = estadoJuego.participantesActivos[estadoJuego.turnoActual];
         
-        if (!subastaActiva.participantesQuePasaron.includes(participanteId)) {
+        if (!estadoJuego.participantesQuePasaron.includes(participanteId)) {
             const participante = PARTICIPANTES[participanteId];
-            mostrarMensaje(`<br>⏰ <b>TURNO DE: ${participante.nombre}</b> (10 segundos)`, 'turno');
+            mostrarMensaje(`<br>⏰ <b>TURNO: ${participante.nombre}</b> (10 segundos)`, 'turno');
             
             iniciarTemporizador();
             
-            // Si es turno de IA, ejecutar después de 5-8 segundos
             if (participanteId !== 'player') {
-                const tiempoEspera = Math.random() * 3000 + 5000; // 5-8 segundos
+                const tiempoEspera = Math.random() * 3000 + 5000;
                 setTimeout(() => {
-                    if (subastaActiva.participantesActivos[subastaActiva.turnoActual] === participanteId) {
+                    if (estadoJuego.participantesActivos[estadoJuego.turnoActual] === participanteId) {
                         ejecutarTurnoIA(participanteId);
                     }
                 }, tiempoEspera);
@@ -186,54 +288,50 @@ function empezarTurno() {
             return;
         }
         
-        subastaActiva.turnoActual = (subastaActiva.turnoActual + 1) % subastaActiva.participantesActivos.length;
+        estadoJuego.turnoActual = (estadoJuego.turnoActual + 1) % estadoJuego.participantesActivos.length;
         intentos++;
     }
     
-    // Si todos pasaron, cerrar subasta
     cerrarSubasta();
 }
 
 function pasarTurno() {
     detenerTemporizador();
     
-    const participanteActualId = subastaActiva.participantesActivos[subastaActiva.turnoActual];
+    const participanteActualId = estadoJuego.participantesActivos[estadoJuego.turnoActual];
     
-    if (!subastaActiva.participantesQuePasaron.includes(participanteActualId)) {
-        subastaActiva.participantesQuePasaron.push(participanteActualId);
+    if (!estadoJuego.participantesQuePasaron.includes(participanteActualId)) {
+        estadoJuego.participantesQuePasaron.push(participanteActualId);
         mostrarMensaje(`⏭️ <b>${PARTICIPANTES[participanteActualId].nombre}</b> pasó su turno.`, 'alerta');
     }
     
-    // Verificar si solo queda un participante activo
-    if (subastaActiva.participantesQuePasaron.length >= subastaActiva.participantesActivos.length - 1) {
+    if (estadoJuego.participantesQuePasaron.length >= estadoJuego.participantesActivos.length - 1) {
         cerrarSubasta();
         return;
     }
     
-    // Pasar al siguiente turno
-    subastaActiva.turnoActual = (subastaActiva.turnoActual + 1) % subastaActiva.participantesActivos.length;
-    empezarTurno();
+    estadoJuego.turnoActual = (estadoJuego.turnoActual + 1) % estadoJuego.participantesActivos.length;
+    setTimeout(() => empezarTurno(), 2000);
 }
 
 function cerrarSubasta() {
     detenerTemporizador();
     
-    if (subastaActiva.postorActualId === null || subastaActiva.ofertaActual === 0) {
-        subastaActiva.postorActualId = null;
+    if (estadoJuego.postorActualId === null) {
+        estadoJuego.ofertaActual = 0;
     }
     
-    subastaActiva.revelacionPendiente = true;
-    mostrarMensaje("🔒 <b>--- SUBASTA CERRADA ---</b> Presiona REVELAR JUGADOR para ver el resultado.", 'info');
+    estadoJuego.revelacionPendiente = true;
+    mostrarMensaje("🔒 <b>SUBASTA CERRADA</b> - Presiona REVELAR JUGADOR", 'info');
     actualizarInterfaz();
 }
 
-// --- 5. LÓGICA DE PUJA ---
+// --- 8. LÓGICA DE PUJA ---
 
 function pujar(monto, postorId = 'player') {
-    if (subastaActiva.revelacionPendiente) return;
+    if (estadoJuego.revelacionPendiente) return;
     
-    // Verificar que sea el turno del postor
-    const participanteActualId = subastaActiva.participantesActivos[subastaActiva.turnoActual];
+    const participanteActualId = estadoJuego.participantesActivos[estadoJuego.turnoActual];
     if (participanteActualId !== postorId) {
         if (postorId === 'player') {
             mostrarMensaje('❌ No es tu turno.', 'alerta');
@@ -243,7 +341,6 @@ function pujar(monto, postorId = 'player') {
 
     const postor = PARTICIPANTES[postorId];
     
-    // Validaciones
     if (monto > postor.presupuesto) {
         if (postorId === 'player') {
             mostrarMensaje('❌ No tienes suficiente presupuesto.', 'alerta');
@@ -251,28 +348,24 @@ function pujar(monto, postorId = 'player') {
         return;
     }
     
-    if (monto <= subastaActiva.ofertaActual) {
+    if (monto <= estadoJuego.ofertaActual) {
         if (postorId === 'player') {
             mostrarMensaje('❌ La oferta debe ser mayor a la actual.', 'alerta');
         }
         return;
     }
 
-    subastaActiva.ofertaActual = monto;
-    subastaActiva.postorActualId = postorId;
-    postor.ultimaPuja = monto;
-
-    // Resetear los que pasaron (todos vuelven a estar activos)
-    subastaActiva.participantesQuePasaron = [];
+    estadoJuego.ofertaActual = monto;
+    estadoJuego.postorActualId = postorId;
+    estadoJuego.participantesQuePasaron = [];
 
     actualizarInterfaz();
-    mostrarMensaje(`📈 <b>[${postor.nombre}]</b> puja con <b>${formatoDinero(monto)}</b>.`, 'ganador');
+    mostrarMensaje(`📈 <b>${postor.nombre}</b> puja <b>${formatoDinero(monto)}</b>`, 'ganador');
 
-    // Pasar al siguiente turno
     detenerTemporizador();
-    subastaActiva.turnoActual = (subastaActiva.turnoActual + 1) % subastaActiva.participantesActivos.length;
+    estadoJuego.turnoActual = (estadoJuego.turnoActual + 1) % estadoJuego.participantesActivos.length;
     
-    setTimeout(() => empezarTurno(), 2000); // 2 segundos de pausa entre turnos
+    setTimeout(() => empezarTurno(), 2000);
 }
 
 function pujarManual() {
@@ -289,39 +382,53 @@ function pujarManual() {
 }
 
 function ejecutarTurnoIA(iaId) {
-    if (subastaActiva.revelacionPendiente) return;
-    if (subastaActiva.participantesActivos[subastaActiva.turnoActual] !== iaId) return;
+    if (estadoJuego.revelacionPendiente) return;
+    if (estadoJuego.participantesActivos[estadoJuego.turnoActual] !== iaId) return;
 
     const ia = PARTICIPANTES[iaId];
-    const precioSugerido = subastaActiva.jugadorOculto.precio_sugerido;
-    const topePuja = iaId === 'ia1' ? subastaActiva.topePujaIA1 : subastaActiva.topePujaIA2;
+    const precioSugerido = estadoJuego.jugadorOculto.precio_sugerido;
+    const topePuja = iaId === 'ia1' ? estadoJuego.topePujaIA1 : estadoJuego.topePujaIA2;
+    
+    // Calcular situación crítica
+    const jugadoresRestantes = estadoJuego.jugadoresDisponiblesRonda.filter(j => !j.vendido).length;
+    const participantesRestantes = contarParticipantesNecesitanPosicion(estadoJuego.posicionActual);
+    const esSituacionCritica = jugadoresRestantes <= participantesRestantes;
 
-    // Lógica de Salto (15% conservadora, 10% agresiva)
-    const probabilidadSalto = ia.perfil === 'conservadora' ? 0.15 : 0.10;
-    if (!ia.salto_usado && Math.random() < probabilidadSalto) {
-        ia.salto_usado = true;
-        mostrarMensaje(`⏭️ <b>[${ia.nombre}]</b> usa su SALTO y pasa esta subasta.`, 'alerta');
-        pasarTurno();
-        return;
+    // Salto solo si NO es situación crítica
+    if (!esSituacionCritica && !ia.salto_usado) {
+        const probabilidadSalto = ia.perfil === 'conservadora' ? 0.15 : 0.10;
+        if (Math.random() < probabilidadSalto) {
+            ia.salto_usado = true;
+            mostrarMensaje(`⏭️ <b>${ia.nombre}</b> usa su SALTO`, 'alerta');
+            pasarTurno();
+            return;
+        }
     }
 
-    // Decidir si puja o pasa
-    const ofertaMinima = subastaActiva.ofertaActual + 1000000;
+    const ofertaMinima = estadoJuego.ofertaActual + 1000000;
     
+    // Si es situación crítica, DEBE pujar si puede
+    if (esSituacionCritica) {
+        if (ofertaMinima <= ia.presupuesto && ofertaMinima <= topePuja) {
+            const nuevaOferta = Math.min(ofertaMinima + 1000000, topePuja, ia.presupuesto);
+            pujar(nuevaOferta, iaId);
+            return;
+        }
+    }
+    
+    // Lógica normal
     if (ofertaMinima > topePuja || ofertaMinima > ia.presupuesto) {
-        mostrarMensaje(`🚫 <b>[${ia.nombre}]</b> se retira de la puja.`);
+        mostrarMensaje(`🚫 <b>${ia.nombre}</b> se retira`, 'alerta');
         pasarTurno();
         return;
     }
 
-    // Calcular nueva oferta
-    let incrementoBase = Math.floor(Math.random() * 3 + 1) * 1000000;
+    let incremento = Math.floor(Math.random() * 3 + 1) * 1000000;
     if (ia.perfil === 'agresiva') {
-        incrementoBase = Math.floor(Math.random() * 5 + 2) * 1000000;
+        incremento = Math.floor(Math.random() * 5 + 2) * 1000000;
     }
     
-    const nuevaOferta = Math.min(ofertaMinima + incrementoBase, topePuja, ia.presupuesto);
-    
+    const nuevaOferta = Math.min(ofertaMinima + incremento, topePuja, ia.presupuesto);
     pujar(nuevaOferta, iaId);
 }
 
@@ -333,45 +440,39 @@ function usarSalto() {
         return;
     }
     
-    if (!subastaActiva.jugadorOculto || subastaActiva.revelacionPendiente) {
-        mostrarMensaje('❌ No hay subasta activa.', 'alerta');
-        return;
-    }
-    
-    // Verificar que sea tu turno
-    const participanteActualId = subastaActiva.participantesActivos[subastaActiva.turnoActual];
+    const participanteActualId = estadoJuego.participantesActivos[estadoJuego.turnoActual];
     if (participanteActualId !== 'player') {
         mostrarMensaje('❌ No es tu turno.', 'alerta');
         return;
     }
     
     player.salto_usado = true;
-    mostrarMensaje('⏭️ Has usado tu SALTO. Pasas esta subasta.', 'alerta');
-    
+    mostrarMensaje('⏭️ Has usado tu SALTO', 'alerta');
     pasarTurno();
 }
 
-// --- 6. REVELACIÓN Y AVANCE ---
+// --- 9. REVELACIÓN ---
 
 function revelarJugador() {
-    if (!subastaActiva.revelacionPendiente) return;
+    if (!estadoJuego.revelacionPendiente || estadoJuego.revelacionEnProceso) return;
     
+    estadoJuego.revelacionEnProceso = true;
     detenerTemporizador();
-
-    const jugadorReal = subastaActiva.jugadorOculto;
-    const precio = subastaActiva.ofertaActual;
-
+    actualizarInterfaz();
+    
+    const jugadorReal = estadoJuego.jugadorOculto;
+    const precio = estadoJuego.ofertaActual;
+    
     mostrarMensaje(`<br>🥁🥁🥁 <b>¡REVELACIÓN!</b> 🥁🥁🥁`, 'ganador');
     
-    // Pausa dramática de 2 segundos antes de revelar
     setTimeout(() => {
-        mostrarMensaje(`<br>El jugador era... <b>${jugadorReal.nombre}</b>!`, 'ganador');
-        mostrarMensaje(`📊 Media: ${jugadorReal.media} | Puesto: ${jugadorReal.puesto}`, 'info');
+        mostrarMensaje(`<br>🎭 El jugador era... <b style="font-size: 1.3em; color: #4CAF50;">${jugadorReal.nombre}</b>!`, 'ganador');
+        mostrarMensaje(`📊 Media: <b>${jugadorReal.media}</b> | Puesto: <b>${jugadorReal.puesto}</b>`, 'info');
 
-        if (subastaActiva.postorActualId === null || precio === 0) {
-            mostrarMensaje(`❌ Nadie lo quiso. ${jugadorReal.nombre} no se vendió.`, 'info');
+        if (estadoJuego.postorActualId === null || precio === 0) {
+            mostrarMensaje(`<br>❌ Nadie lo quiso. <b>${jugadorReal.nombre}</b> no se vendió.`, 'alerta');
         } else {
-            const ganador = PARTICIPANTES[subastaActiva.postorActualId];
+            const ganador = PARTICIPANTES[estadoJuego.postorActualId];
 
             ganador.presupuesto -= precio;
             ganador.equipo.push({ 
@@ -382,70 +483,36 @@ function revelarJugador() {
             });
             ganador.posicionesOcupadas.push(jugadorReal.puesto);
             
-            if (typeof TODOS_LOS_JUGADORES !== 'undefined') {
-                const jugadorGlobal = TODOS_LOS_JUGADORES.find(j => j.id === jugadorReal.id);
-                if (jugadorGlobal) jugadorGlobal.vendido = true;
-            }
+            jugadorReal.vendido = true;
 
-            mostrarMensaje(`🏆 ¡<b>${ganador.nombre}</b> ganó y pagó <b>${formatoDinero(precio)}</b>! Posición ocupada: ${jugadorReal.puesto}`, 'ganador');
+            mostrarMensaje(`<br>🏆 <b>${ganador.nombre}</b> GANÓ!`, 'ganador');
+            mostrarMensaje(`💰 Pagó: <b>${formatoDinero(precio)}</b>`, 'ganador');
+            mostrarMensaje(`✅ Posición ocupada: <b>${jugadorReal.puesto}</b>`, 'info');
         }
         
-        subastaActiva.revelacionPendiente = false;
-        subastaActiva.jugadorOculto = null;
-        subastaActiva.jugadorPublico = null;
-        actualizarInterfaz();
+        estadoJuego.jugadoresSubastadosEnRonda++;
         
-        setTimeout(iniciarSiguienteSubasta, 4000); // Más tiempo antes de la siguiente subasta
-    }, 2000); // Pausa dramática
+        setTimeout(() => {
+            mostrarMensaje(`<br><button onclick="continuarSiguiente()" style="padding: 15px 30px; background: #2196F3; color: white; border: none; cursor: pointer; font-size: 18px; font-weight: bold; border-radius: 8px;">➡️ CONTINUAR</button>`, 'info');
+        }, 1500);
+        
+    }, 2000);
 }
 
-function iniciarSiguienteSubasta() {
-    if (typeof TODOS_LOS_JUGADORES === 'undefined' || TODOS_LOS_JUGADORES.length === 0) {
-        mostrarMensaje('❌ No hay jugadores disponibles.', 'alerta');
-        return;
-    }
-
-    // Verificar si todos completaron sus equipos
-    const todosCompletos = Object.values(PARTICIPANTES).every(p => 
-        p.posicionesOcupadas.length >= POSICIONES_REQUERIDAS.length
-    );
-    
-    if (todosCompletos) {
-        mostrarMensaje('🎉 <b>¡JUEGO TERMINADO!</b> Todos completaron sus equipos.', 'ganador');
-        mostrarResumenFinal();
-        return;
-    }
-
-    const disponibles = TODOS_LOS_JUGADORES.filter(j => !j.vendido);
-    
-    if (disponibles.length === 0) {
-        mostrarMensaje('🎉 <b>¡JUEGO TERMINADO!</b> No hay más jugadores.', 'ganador');
-        mostrarResumenFinal();
-        return;
-    }
-
-    // Seleccionar jugador aleatorio
-    const jugadorSeleccionado = disponibles[Math.floor(Math.random() * disponibles.length)];
-    
-    subastaActiva.rondaActual++;
-    subastaActiva.jugadorOculto = jugadorSeleccionado;
-    subastaActiva.jugadorPublico = {
-        puesto: jugadorSeleccionado.puesto,
-        precio_sugerido: jugadorSeleccionado.precio_sugerido
-    };
-    subastaActiva.ofertaActual = 0;
-    subastaActiva.postorActualId = null;
-    subastaActiva.participantesQuePasaron = [];
-    subastaActiva.revelacionPendiente = false;
-    
-    subastaActiva.topePujaIA1 = calcularTopePuja('conservadora', jugadorSeleccionado.precio_sugerido);
-    subastaActiva.topePujaIA2 = calcularTopePuja('agresiva', jugadorSeleccionado.precio_sugerido);
+function continuarSiguiente() {
+    estadoJuego.revelacionPendiente = false;
+    estadoJuego.jugadorOculto = null;
+    estadoJuego.jugadorPublico = null;
+    estadoJuego.revelacionEnProceso = false;
     
     actualizarInterfaz();
-    mostrarMensaje(`<br>--- 🏁 <b>RONDA ${subastaActiva.rondaActual}</b> ---`, 'info');
-    mostrarMensaje(`📢 Subasta: <b>Jugador Misterioso (${jugadorSeleccionado.puesto})</b> - Precio: ${formatoDinero(jugadorSeleccionado.precio_sugerido)}`, 'info');
-    
-    iniciarTurnos();
+    setTimeout(() => iniciarSubastaIndividual(), 1000);
+}
+
+function finalizarRondaPosicion() {
+    mostrarMensaje(`<br>✅ <b>RONDA COMPLETADA: ${estadoJuego.posicionActual}</b>`, 'ganador');
+    estadoJuego.posicionActualIndex++;
+    setTimeout(() => iniciarRondaPosicion(), 3000);
 }
 
 function mostrarResumenFinal() {
@@ -453,26 +520,26 @@ function mostrarResumenFinal() {
     
     Object.values(PARTICIPANTES).forEach(p => {
         const totalGastado = 100000000 - p.presupuesto;
-        mostrarMensaje(`<b>${p.nombre}</b>: ${p.equipo.length} jugadores (${p.posicionesOcupadas.join(', ')}) - Gastó: ${formatoDinero(totalGastado)}`, 'info');
+        mostrarMensaje(`<b>${p.nombre}</b>: ${p.equipo.length} jugadores | Gastó: ${formatoDinero(totalGastado)}`, 'info');
     });
 }
 
-// --- 7. INTERFAZ ---
+// --- 10. INTERFAZ ---
 
 function actualizarInterfaz() {
-    const jugador = subastaActiva.jugadorPublico;
-    const postorNombre = subastaActiva.postorActualId ? PARTICIPANTES[subastaActiva.postorActualId].nombre : 'Nadie';
-    
-    const participanteActualId = subastaActiva.participantesActivos[subastaActiva.turnoActual];
-    const esTuTurno = participanteActualId === 'player' && !subastaActiva.revelacionPendiente;
+    const jugador = estadoJuego.jugadorPublico;
+    const postorNombre = estadoJuego.postorActualId ? PARTICIPANTES[estadoJuego.postorActualId].nombre : 'Nadie';
+    const participanteActualId = estadoJuego.participantesActivos[estadoJuego.turnoActual];
+    const esTuTurno = participanteActualId === 'player' && !estadoJuego.revelacionPendiente;
 
     const infoSubasta = document.getElementById('info-subasta');
     if (infoSubasta) {
         infoSubasta.innerHTML = `
-            <h2>En Subasta: ${subastaActiva.revelacionPendiente ? '🔒 CERRADA' : (jugador ? `🎭 Jugador Misterioso (${jugador.puesto})` : '⏳ Esperando...')}</h2>
+            <h2>${estadoJuego.revelacionPendiente ? '🔒 CERRADA' : (jugador ? `🎭 Jugador Misterioso (${jugador.puesto})` : '⏳ Esperando...')}</h2>
             <p>Precio Sugerido: <b>${jugador ? formatoDinero(jugador.precio_sugerido) : 'N/A'}</b></p>
-            <p>Oferta Actual: <b style="color: red; font-size: 1.5em;">${formatoDinero(subastaActiva.ofertaActual)}</b> (Postor: ${postorNombre})</p>
-            ${!subastaActiva.revelacionPendiente && participanteActualId ? `<p style="background: ${esTuTurno ? '#4CAF50' : '#FF9800'}; color: white; padding: 10px; border-radius: 5px; font-weight: bold;">⏰ TURNO: ${PARTICIPANTES[participanteActualId].nombre} (${subastaActiva.tiempoRestante}s)</p>` : ''}
+            <p>Oferta Actual: <b style="color: red; font-size: 1.5em;">${formatoDinero(estadoJuego.ofertaActual)}</b> (${postorNombre})</p>
+            ${!estadoJuego.revelacionPendiente && participanteActualId ? `<p style="background: ${esTuTurno ? '#4CAF50' : '#FF9800'}; color: white; padding: 10px; border-radius: 5px; font-weight: bold;">⏰ TURNO: ${PARTICIPANTES[participanteActualId].nombre} (${estadoJuego.tiempoRestante}s)</p>` : ''}
+            ${estadoJuego.posicionActual ? `<p style="font-size: 0.9em; color: #666;">📍 Ronda: ${estadoJuego.posicionActual} (${estadoJuego.jugadoresSubastadosEnRonda}/${JUGADORES_POR_POSICION})</p>` : ''}
         `;
     }
 
@@ -480,11 +547,11 @@ function actualizarInterfaz() {
     if (infoParticipantes) {
         infoParticipantes.innerHTML = `
             <h3>💰 Presupuestos y Equipos</h3>
-            <p><b>${PARTICIPANTES.player.nombre}</b>: ${formatoDinero(PARTICIPANTES.player.presupuesto)} | Equipo: ${PARTICIPANTES.player.equipo.length} (${PARTICIPANTES.player.posicionesOcupadas.join(', ') || 'Ninguna'}) | Salto: ${PARTICIPANTES.player.salto_usado ? '✅' : '⭕'}</p>
-            <p>${PARTICIPANTES.ia1.nombre}: ${formatoDinero(PARTICIPANTES.ia1.presupuesto)} | Equipo: ${PARTICIPANTES.ia1.equipo.length} (${PARTICIPANTES.ia1.posicionesOcupadas.join(', ') || 'Ninguna'}) | Salto: ${PARTICIPANTES.ia1.salto_usado ? '✅' : '⭕'}</p>
-            <p>${PARTICIPANTES.ia2.nombre}: ${formatoDinero(PARTICIPANTES.ia2.presupuesto)} | Equipo: ${PARTICIPANTES.ia2.equipo.length} (${PARTICIPANTES.ia2.posicionesOcupadas.join(', ') || 'Ninguna'}) | Salto: ${PARTICIPANTES.ia2.salto_usado ? '✅' : '⭕'}</p>
+            <p><b>${PARTICIPANTES.player.nombre}</b>: ${formatoDinero(PARTICIPANTES.player.presupuesto)} | ${PARTICIPANTES.player.equipo.length} jugadores | Salto: ${PARTICIPANTES.player.salto_usado ? '✅' : '⭕'}</p>
+            <p>${PARTICIPANTES.ia1.nombre}: ${formatoDinero(PARTICIPANTES.ia1.presupuesto)} | ${PARTICIPANTES.ia1.equipo.length} jugadores | Salto: ${PARTICIPANTES.ia1.salto_usado ? '✅' : '⭕'}</p>
+            <p>${PARTICIPANTES.ia2.nombre}: ${formatoDinero(PARTICIPANTES.ia2.presupuesto)} | ${PARTICIPANTES.ia2.equipo.length} jugadores | Salto: ${PARTICIPANTES.ia2.salto_usado ? '✅' : '⭕'}</p>
             
-            ${subastaActiva.revelacionPendiente ? `<button onclick="revelarJugador()" style="padding: 12px 24px; background: #4CAF50; color: white; border: none; cursor: pointer; font-size: 16px; font-weight: bold; border-radius: 5px; margin-top: 10px;">🎁 REVELAR JUGADOR</button>` : ''}
+            ${estadoJuego.revelacionPendiente && !estadoJuego.revelacionEnProceso ? `<button onclick="revelarJugador()" style="padding: 12px 24px; background: #4CAF50; color: white; border: none; cursor: pointer; font-size: 16px; font-weight: bold; border-radius: 5px; margin-top: 10px;">🎁 REVELAR JUGADOR</button>` : ''}
         `;
     }
     
@@ -492,24 +559,27 @@ function actualizarInterfaz() {
     const botonPuja = document.getElementById('boton-puja');
     const botonSalto = document.getElementById('boton-salto');
 
-    const deshabilitar = !esTuTurno || subastaActiva.revelacionPendiente;
+    const deshabilitar = !esTuTurno || estadoJuego.revelacionPendiente;
     
     if (input) input.disabled = deshabilitar;
     if (botonPuja) botonPuja.disabled = deshabilitar;
     if (botonSalto) botonSalto.disabled = deshabilitar || PARTICIPANTES.player.salto_usado;
 }
 
-// Exponer funciones globalmente
-window.revelarJugador = revelarJugador; 
+// --- EXPORTAR FUNCIONES ---
+
+window.revelarJugador = revelarJugador;
+window.continuarSiguiente = continuarSiguiente;
 window.pujarManual = pujarManual;
 window.usarSalto = usarSalto;
 
-// Inicialización
+// --- INICIALIZACIÓN ---
+
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof TODOS_LOS_JUGADORES === 'undefined' || TODOS_LOS_JUGADORES.length === 0) {
-        mostrarMensaje('⚠️ <b>ERROR:</b> No se encontró jugadores.js', 'alerta');
+        mostrarMensaje('❌ ERROR: No se encontró jugadores.js', 'alerta');
     } else {
-        mostrarMensaje('✅ Juego cargado. ¡Empezando!', 'info');
-        setTimeout(iniciarSiguienteSubasta, 1000);
+        mostrarMensaje('✅ Juego cargado correctamente', 'info');
+        setTimeout(() => iniciarRondaPosicion(), 1000);
     }
 });
