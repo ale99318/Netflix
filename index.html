@@ -5,32 +5,64 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>⚽ Simulación de Subasta de Fútbol</title>
     
-    <link rel="stylesheet" href="styles.css"> 
-    
+    <!-- CSS corregido: tu archivo se llama style.css (singular) -->
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- Header Principal -->
+    <header>
+        <h1>🏆 Simulación de Subasta de Fútbol</h1>
+    </header>
 
-    <h1>🏆 Simulación de Subasta de Fútbol</h1>
-
+    <!-- Contenedor Principal -->
     <div class="container">
-        
+        <!-- Columna Izquierda: Información de la Subasta Actual -->
         <div id="info-subasta" class="column">
-            <h2>Cargando...</h2>
+            <h2>⏳ Cargando Subasta...</h2>
+            <div id="jugador-actual">
+                <p>Preparando jugadores...</p>
+            </div>
+            <div id="controles-puja">
+                <!-- Botones de puja aparecerán aquí dinámicamente -->
+            </div>
         </div>
 
+        <!-- Columna Derecha: Información de Participantes -->
         <div id="info-participantes" class="column">
-            <h3>Cargando Datos...</h3>
+            <h3>👥 Participantes</h3>
+            <div id="lista-participantes">
+                <p>Cargando datos de equipos...</p>
+            </div>
         </div>
-
-    </div>
-    
-    <div id="log-subasta">
-        <p style="color: #666;">Iniciando sesión de subasta...</p>
     </div>
 
-    <script src="jugadores.js"></script> 
-    
-    <script type="module" src="main.js"></script> 
+    <!-- Sección de Mensajes/Log -->
+    <section id="mensajes-container">
+        <h3>📋 Registro de Actividad</h3>
+        <div id="mensajes">
+            <div class="mensaje info">
+                <p>🔄 Iniciando sistema de subasta...</p>
+            </div>
+        </div>
+    </section>
 
+    <!-- Log Detallado de Subasta (opcional, para debugging) -->
+    <section id="log-subasta">
+        <details>
+            <summary>🔍 Ver Log Técnico</summary>
+            <div id="log-contenido">
+                <p style="color: #666; font-size: 0.9em;">Sesión de subasta iniciada...</p>
+            </div>
+        </details>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <p>⚽ Simulador de Subasta de Fútbol | Versión 1.0</p>
+    </footer>
+
+    <!-- SCRIPTS -->
+    <!-- SOLO módulo principal - jugadores.js se importa dentro de main.js -->
+    <script type="module" src="main.js"></script>
 </body>
 </html>
