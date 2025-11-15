@@ -265,6 +265,25 @@ function iniciarTurnos() {
 function empezarTurno() {
     if (estadoJuego.revelacionPendiente) return;
     
+    // CORRECCIÓN 2: Verificar cierre antes de empezar turno
+    const participantesActivos = estadoJuego.participantesActivos.filter(
+        id => !estadoJuego.participantesQuePasaron.includes(id)
+    );
+    
+    if (participantesActivos.length === 0) {
+        cerrarSubasta();
+        return;
+    }
+    
+    if (participantesActivos.length === 1) {
+        if (estadoJuego.postorActualId && participantesActivos[0] === estadoJuego.postorActualId) {
+            mostrarMensaje(`🏆 <b>${PARTICIPANTES[estadoJuego.postorActualId].nombre}</b> gana automáticamente!`, 'ganador');
+            setTimeout(() => cerrarSubasta(), 1500);
+            return;
+        }
+    }
+    
+    // Encontrar el siguiente participante activo que no haya pasado
     let intentos = 0;
     while (intentos < estadoJuego.participantesActivos.length) {
         const participanteId = estadoJuego.participantesActivos[estadoJuego.turnoActual];
@@ -292,6 +311,7 @@ function empezarTurno() {
         intentos++;
     }
     
+    // Si llegamos aquí, todos pasaron
     cerrarSubasta();
 }
 
@@ -305,13 +325,36 @@ function pasarTurno() {
         mostrarMensaje(`⏭️ <b>${PARTICIPANTES[participanteActualId].nombre}</b> pasó su turno.`, 'alerta');
     }
     
-    if (estadoJuego.participantesQuePasaron.length >= estadoJuego.participantesActivos.length - 1) {
+    // CORRECCIÓN 2: Verificar condición de cierre inmediato
+    const participantesActivos = estadoJuego.participantesActivos.filter(
+        id => !estadoJuego.participantesQuePasaron.includes(id)
+    );
+    
+    // Si no queda nadie activo o solo queda el postor actual
+    if (participantesActivos.length === 0) {
         cerrarSubasta();
         return;
     }
     
-    estadoJuego.turnoActual = (estadoJuego.turnoActual + 1) % estadoJuego.participantesActivos.length;
-    setTimeout(() => empezarTurno(), 2000);
+    if (participantesActivos.length === 1) {
+        if (estadoJuego.postorActualId && participantesActivos[0] === estadoJuego.postorActualId) {
+            // Solo queda el postor actual, gana automáticamente
+            mostrarMensaje(`🏆 <b>${PARTICIPANTES[estadoJuego.postorActualId].nombre}</b> gana por ser el único que queda!`, 'ganador');
+            setTimeout(() => cerrarSubasta(), 1500);
+            return;
+        }
+    }
+    
+    // Si todavía hay 2 o más activos, continuar con el siguiente turno
+    if (participantesActivos.length >= 2 || 
+        (participantesActivos.length === 1 && estadoJuego.postorActualId === null)) {
+        estadoJuego.turnoActual = (estadoJuego.turnoActual + 1) % estadoJuego.participantesActivos.length;
+        setTimeout(() => empezarTurno(), 2000);
+        return;
+    }
+    
+    // En cualquier otro caso, cerrar
+    cerrarSubasta();
 }
 
 function cerrarSubasta() {
@@ -357,10 +400,25 @@ function pujar(monto, postorId = 'player') {
 
     estadoJuego.ofertaActual = monto;
     estadoJuego.postorActualId = postorId;
-    estadoJuego.participantesQuePasaron = [];
+    
+    // CORRECCIÓN 1: NO limpiar participantesQuePasaron
+    // Una vez que alguien pasa, permanece fuera de esta subasta
 
     actualizarInterfaz();
     mostrarMensaje(`📈 <b>${postor.nombre}</b> puja <b>${formatoDinero(monto)}</b>`, 'ganador');
+
+    // CORRECCIÓN 2: Verificar cierre inmediato si solo queda 1 activo
+    const participantesActivos = estadoJuego.participantesActivos.filter(
+        id => !estadoJuego.participantesQuePasaron.includes(id)
+    );
+    
+    if (participantesActivos.length === 1 && participantesActivos[0] === postorId) {
+        // Solo queda el postor actual, cerrar subasta inmediatamente
+        detenerTemporizador();
+        mostrarMensaje(`🏆 <b>${postor.nombre}</b> es el único que queda. ¡Subasta ganada!`, 'ganador');
+        setTimeout(() => cerrarSubasta(), 1500);
+        return;
+    }
 
     detenerTemporizador();
     estadoJuego.turnoActual = (estadoJuego.turnoActual + 1) % estadoJuego.participantesActivos.length;
