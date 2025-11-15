@@ -24,35 +24,10 @@ import {
 // 4. Importar jugadores
 import { TODOS_LOS_JUGADORES } from './jugadores.js';
 
-// --- Validación de Importaciones ---
-function validarImportaciones() {
-    const funcionesRequeridas = {
-        'actualizarInterfaz': actualizarInterfaz,
-        'revelarJugador': revelarJugador,
-        'pujarConAumento': pujarConAumento,
-        'usarSalto': usarSalto,
-        'iniciarSiguienteSubasta': iniciarSiguienteSubasta,
-        'ejecutarTurnoIA': ejecutarTurnoIA,
-        'mostrarEquipo': mostrarEquipo,
-        'formatoDinero': formatoDinero,
-        'mostrarMensaje': mostrarMensaje
-    };
-    
-    for (const [nombre, funcion] of Object.entries(funcionesRequeridas)) {
-        if (typeof funcion !== 'function') {
-            throw new Error(`❌ Fallo al importar función: ${nombre}`);
-        }
-    }
-    
-    if (!Array.isArray(TODOS_LOS_JUGADORES) || TODOS_LOS_JUGADORES.length === 0) {
-        throw new Error('❌ Lista de jugadores inválida o vacía');
-    }
-    
-    console.log('✅ Todas las importaciones validadas correctamente');
-    return true;
-}
-
 // --- Exponer funciones al Ámbito Global ---
+// Esto es CRUCIAL para que:
+// 1. El HTML pueda llamar a funciones con 'onclick'.
+// 2. Módulos con dependencia circular puedan comunicarse.
 function exponerAPI() {
     // Funciones de Interfaz y Flujo
     window.actualizarInterfaz = actualizarInterfaz;
@@ -69,18 +44,6 @@ function exponerAPI() {
         mostrarMensaje
     };
     
-    // Datos de jugadores (para debugging en consola)
-    // Solo se expone si detectamos que estamos en desarrollo
-    // Verificamos si la URL contiene 'localhost' o '127.0.0.1'
-    const esDesarrollo = window.location.hostname === 'localhost' || 
-                         window.location.hostname === '127.0.0.1' ||
-                         window.location.hostname === '';
-    
-    if (esDesarrollo) {
-        window.JUGADORES_DEBUG = TODOS_LOS_JUGADORES;
-        console.log('🔧 Modo desarrollo detectado. Escribe "JUGADORES_DEBUG" en consola para ver los jugadores.');
-    }
-    
     console.log('✅ API expuesta globalmente');
 }
 
@@ -89,13 +52,15 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
         console.log('🚀 Iniciando juego...');
         
-        // Validar que todo se importó correctamente
-        validarImportaciones();
+        // Validar jugadores
+        if (!Array.isArray(TODOS_LOS_JUGADORES) || TODOS_LOS_JUGADORES.length === 0) {
+            throw new Error('❌ Lista de jugadores inválida o vacía');
+        }
         
         // Exponer API al ámbito global
         exponerAPI();
         
-        // Mensaje de éxito
+        // Mensajes de éxito
         mostrarMensaje('✅ Sistema cargado correctamente', 'info');
         mostrarMensaje(
             `🎮 ${TODOS_LOS_JUGADORES.length} jugadores disponibles para la subasta`, 
@@ -117,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const mensajeError = `
             <strong>⚠️ ERROR DE INICIALIZACIÓN</strong><br>
             ${error.message}<br>
-            <small>Verifica la consola del navegador (F12) para más detalles.</small>
+            <small>Abre la consola (F12) para más detalles.</small>
         `;
         
         // Intentar mostrar error en la UI
@@ -133,11 +98,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 contenedorMensajes.appendChild(div);
             } else {
                 // Último recurso: alert nativo
-                alert(`Error: ${error.message}`);
+                alert(`Error de inicialización: ${error.message}`);
             }
         }
     }
 });
-
-// Exportar para tests (opcional)
-export { validarImportaciones, exponerAPI };
